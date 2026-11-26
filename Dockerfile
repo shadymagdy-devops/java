@@ -1,3 +1,5 @@
-FROM openjdk:11.0.11-slim
-COPY ./target/demo1-0.0.1-SNAPSHOT.jar demo1-0.0.1-SNAPSHOT.jar
-ENTRYPOINT ["java", "-jar", "demo1-0.0.1-SNAPSHOT.jar"]
+FROM eclipse-temurin:11-jre
+WORKDIR /app
+COPY target/demo1-0.0.1-SNAPSHOT.jar app.jar
+EXPOSE 8090
+ENTRYPOINT ["java", "-jar", "app.jar"]
