@@ -1,59 +1,70 @@
-# Java App - Training and Education for DevOps Pipeline
+# Java App - CI/CD with GitHub Actions and ArgoCD
 
-Welcome to the **Java App** repository! This project is designed for training and educational purposes, specifically aimed at providing a hands-on experience for DevOps engineers to create and manage pipelines. In this repository, you will find a containerized Java application that serves as a starting point for learning DevOps practices.
+This is part of my final project for the DevOps course at Route.
 
-## Table of Contents
+The app itself is a small Spring Boot API (taken from Hassan Eid's training repo).
+My work here is the pipeline around it: building it, packaging it as a Docker image,
+pushing it to Docker Hub, and updating the CD repo so ArgoCD deploys the new version.
 
-- [Project Overview](#project-overview)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Creating a Pipeline](#creating-a-pipeline)
-- [Contributing](#contributing)
-- [License](#license)
+## App
 
-## Project Overview
+- Java 11, Spring Boot, Maven
+- Runs on port 8090
+- Endpoints:
+  - `GET /persons/all`
+  - `GET /persons/{id}`
 
-This Java application is a simple example to help DevOps engineers understand how to work with Java apps in a containerized environment. It can be used as a learning tool for creating and managing CI/CD pipelines and deploying Java applications to various environments.
+Run it locally:
 
-## Installation
+    mvn clean package
+    java -jar target/demo1-0.0.1-SNAPSHOT.jar
 
-To get started, follow these steps:
+## Pipeline
 
-1. **Clone the repository**:
+Workflow file: `.github/workflows/ci-cd.yml`
 
-    ```shell
-    git clone https://github.com/Hassan-Eid-Hassan/java.git
-    cd your-repo
-    ```
+It runs manually from the Actions tab (`workflow_dispatch`) and has two jobs.
 
-2. **Build the Docker image**:
+**1. Build and push image**
+- checkout the repo
+- set up Java 11 (temurin)
+- build the JAR with `mvn clean package`
+- upload the JAR as an artifact (`demo1-jar`)
+- build the Docker image for amd64 and arm64 (I deploy on minikube on an M1 Mac, so arm64 was needed)
+- push it to Docker Hub as `shadydex1/java-app:<run-number>-<short-sha>` and `latest`
 
-    ```shell
-    docker build -t java-app .
-    ```
+**2. Update CD repo**
+- checkout [java-cd](https://github.com/shadymagdy-devops/java-cd)
+- replace the image tag in `shady-magdy/deployment.yaml`
+- commit and push, then ArgoCD picks up the change
 
-3. **Run the Docker container**:
+`concurrency` is set so only one run happens at a time. If I trigger it twice,
+the second run waits instead of both pushing at once.
 
-    ```shell
-    docker run -d -p 8090:8090 java-app
-    ```
+## Secrets
 
-## Usage
+Everything is stored in the GitHub environment `shady-magdy`:
 
-Once the container is running, the Java application should be accessible at `http://localhost:8080`. You can interact with the application through the provided endpoints.
+| Secret | What it is |
+|---|---|
+| `DOCKER_USERNAME` | Docker Hub username |
+| `DOCKER_PASSWORD` | Docker Hub access token (not my real password) |
+| `CD_REPO_SSH_KEY` | deploy key with write access to java-cd only |
 
-## Creating a Pipeline
+I used a deploy key for the CD repo because the default `GITHUB_TOKEN`
+can only push to the repo the workflow runs in.
 
-This repository serves as a learning platform for creating a DevOps pipeline. You can experiment with various CI/CD tools such as GitHub Actions, Jenkins, or GitLab CI/CD to create a pipeline that builds, tests, and deploys the Java application. 
+## Dockerfile
 
-For example, you might:
+I changed the base image from `openjdk:11.0.11-slim` to `eclipse-temurin:11-jre`
+because the openjdk images are deprecated, and temurin has an arm64 build.
 
-- **Build** the application using Maven or Gradle.
-- **Test** the application using JUnit or other testing frameworks.
-- **Deploy** the containerized application to a staging or production environment.
+## Deployment
 
-Feel free to explore and customize the pipeline according to your learning goals.
+The Kubernetes files are in the [java-cd](https://github.com/shadymagdy-devops/java-cd) repo
+under `shady-magdy/` (Deployment with 2 replicas + NodePort service on 30090).
+ArgoCD watches that folder with auto sync and self heal enabled.
 
-## Contributing
+## Author
 
-Contributions are welcome! If you find issues or have suggestions for improvements, please feel free to open an issue or submit a pull request.
+Shady Magdy - [GitHub](https://github.com/shadymagdy-devops)
